@@ -1,9 +1,10 @@
 import sys
 import os
 
-# Add common to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from common.utils import get_response
+try:
+    from common.utils import get_response
+except ImportError:
+    from utils import get_response
 
 def lambda_handler(event, context):
     # Function D: ~400ms

@@ -41,7 +41,12 @@ def calibrate_warm(functions, count=50, warmup_count=10):
         logger.log_calibration(func, 'warm', measurements)
         
         # Calculate stats
-        durations = [m['lambda_duration_ms'] for m in measurements]
+        durations = [m['lambda_duration_ms'] for m in measurements if m['lambda_duration_ms'] is not None]
+        
+        if not durations:
+            print(f"  Error: No valid measurements for {func}. Check Lambda logs.")
+            continue
+            
         mu = np.mean(durations)
         sigma = np.std(durations)
         results[func] = {'mu': mu, 'sigma': sigma}

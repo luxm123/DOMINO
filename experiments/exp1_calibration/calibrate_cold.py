@@ -29,15 +29,18 @@ def calibrate_cold(functions, count=30, recycle_wait=30):
             
             res = client.invoke(func)
             if res['status'] == 'success':
-                measurements.append({
+                data = {
                     'iteration': i,
                     'lambda_duration_ms': res['lambda_duration_ms'],
                     'step_latency_ms': res['duration_ms']
-                })
+                }
+                measurements.append(data)
                 print(f"    Duration: {res['lambda_duration_ms']}ms")
-            
-            # Log after each measurement in case of interruption
-            logger.log_calibration(func, 'cold', [measurements[-1]])
+                
+                # Log after each measurement in case of interruption
+                logger.log_calibration(func, 'cold', [data])
+            else:
+                print(f"    Error: {res.get('error_type', 'unknown error')}")
             
     print("Cold start calibration finished.")
 

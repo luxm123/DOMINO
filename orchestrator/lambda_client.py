@@ -39,17 +39,33 @@ class LambdaClient:
                 }
             
             # Read response
-            response_payload = json.loads(response['Payload'].read().decode('utf-8'))
+            payload_raw = response['Payload'].read().decode('utf-8')
+            response_payload = json.loads(payload_raw)
             
+            # Check for Lambda function errors
+            if 'FunctionError' in response:
+                print(f"Lambda Error in {function_name}: {response_payload}")
+                return {
+                    'status': 'error',
+                    'error_type': 'function_error',
+                    'payload': response_payload
+                }
+
             # Extract duration from response body if present (added by our common utils)
-            body = json.loads(response_payload.get('body', '{}'))
+            body_str = response_payload.get('body', '{}')
+            try:
+                body = json.loads(body_str)
+            except (json.JSONDecodeError, TypeError):
+                body = {}
+            
+            lambda_duration = body.get('duration_ms')
             
             return {
                 'status': 'success',
                 'start_time': start_time,
                 'end_time': end_time,
                 'duration_ms': (end_time - start_time) * 1000,
-                'lambda_duration_ms': body.get('duration_ms'),
+                'lambda_duration_ms': lambda_duration,
                 'is_warmup': body.get('is_warmup', False),
                 'request_id': response.get('ResponseMetadata', {}).get('RequestId'),
                 'log_result': response.get('LogResult')
