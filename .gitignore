@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+data/
+analysis/output/
+*.zip
+.DS_Store
+config/aws_config.yaml

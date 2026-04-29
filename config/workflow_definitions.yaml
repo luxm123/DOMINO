@@ -1,0 +1,19 @@
+workflows:
+  chain_3:
+    functions:
+      function_a:
+        next: [function_b]
+      function_b:
+        next: [function_c]
+      function_c:
+        next: []
+  chain_4:
+    functions:
+      function_a:
+        next: [function_b]
+      function_b:
+        next: [function_c]
+      function_c:
+        next: [function_d]
+      function_d:
+        next: []

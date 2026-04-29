@@ -1,0 +1,15 @@
+# This file will be populated after calibration
+functions:
+  function_a:
+    mu: 500
+    sigma: 50
+    delta: 2000
+  function_b:
+    mu: 800
+    sigma: 80
+    delta: 3000
+  function_c:
+    mu: 300
+    sigma: 30
+    delta: 1500
+tau: 30 # conservative estimate in minutes
