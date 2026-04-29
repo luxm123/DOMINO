@@ -8,4 +8,5 @@ data/
 analysis/output/
 *.zip
 .DS_Store
-config/aws_config.yaml
+.env
+config/lambda_trust_policy.json

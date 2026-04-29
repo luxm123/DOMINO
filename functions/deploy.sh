@@ -2,7 +2,7 @@
 
 # Configuration
 REGION="us-east-1"
-ROLE_ARN="arn:aws:iam::your-account-id:role/your-lambda-role" # User needs to replace this
+ROLE_ARN="arn:aws:iam::953334886326:role/domino-lambda-role"
 FUNCTIONS=("function_a" "function_b" "function_c" "function_d")
 MEMORIES=("512" "1024" "256" "512")
 

@@ -1,0 +1,7 @@
+region: us-east-1
+role_arn: arn:aws:iam::953334886326:role/domino-lambda-role
+functions:
+  - function_a
+  - function_b
+  - function_c
+  - function_d

@@ -14,6 +14,8 @@ DOMINO is a project aimed at quantifying and mitigating cold start propagation e
 ## Getting Started
 
 1. Install dependencies: `pip install -r requirements.txt`
-2. Configure AWS credentials.
+2. Configure AWS credentials:
+   - Option 1: Run `aws configure` and enter your Access Key and Secret.
+   - Option 2: Create a `.env` file based on `.env.example`.
 3. Deploy functions: `cd functions && ./deploy.sh`
 4. Run experiments: `cd experiments/exp1_calibration && python calibrate_warm.py`
