@@ -11,7 +11,17 @@ from orchestrator.workflow_executor import WorkflowExecutor
 from orchestrator.event_logger import EventLogger
 from experiments.common.utils import load_config, wait_for_recycle
 
-def run_scenarios(chain, count=200):
+def wait_with_ping(client, minutes, ping_functions):
+    """
+    Wait for some functions to go cold while keeping others warm.
+    """
+    print(f"  Waiting for {minutes} minutes (keeping {ping_functions} warm)...")
+    for _ in range(minutes):
+        for func in ping_functions:
+            client.invoke(func, payload={'warmup': True})
+        time.sleep(60) # Ping every minute
+
+def run_scenarios(chain, count=20):
     client = LambdaClient()
     executor = WorkflowExecutor(client)
     logger = EventLogger(output_dir='data/exp1')
@@ -21,10 +31,10 @@ def run_scenarios(chain, count=200):
     for _ in tqdm(range(count)):
         # Ensure warm by pinging
         for f in chain:
-            client.invoke(f)
+            client.invoke(f, payload={'warmup': True})
         res = executor.execute_chain(chain)
         logger.log_workflow('scenario_A', res)
-        time.sleep(10) # Small gap
+        time.sleep(5) 
         
     # Scenario B: All Cold
     print("Running Scenario B: All Cold...")
@@ -36,35 +46,20 @@ def run_scenarios(chain, count=200):
     # Scenario C: Only A Cold
     print("Running Scenario C: Only A Cold...")
     for _ in tqdm(range(count)):
-        # Pre-warm B and C
-        client.invoke(chain[1])
-        client.invoke(chain[2])
+        # Keep B and C warm for 30 mins while A goes cold
+        wait_with_ping(client, 30, [chain[1], chain[2]])
         
-        wait_for_recycle(30) # But wait enough for A to be cold? 
-        # Actually, to make ONLY A cold, we need to keep B and C warm while A is cold.
-        # This is tricky because wait_for_recycle(30) makes EVERYTHING cold.
-        # Better: wait 30 min, then pre-warm B and C, then immediately run chain.
-        # But A must be cold. So we wait 30 min, pre-warm B/C, and A is still cold.
-        
-        client.invoke(chain[1])
-        client.invoke(chain[2])
-        
-        res = executor.execute_chain(chain, ping_others=True) # ping_others keeps B/C warm during A
+        # Now A should be cold, B and C warm
+        res = executor.execute_chain(chain, ping_others=True) 
         logger.log_workflow('scenario_C', res)
 
     # Scenario D: Only B Cold
     print("Running Scenario D: Only B Cold...")
     for _ in tqdm(range(count)):
-        # Pre-warm A and C
-        client.invoke(chain[0])
-        client.invoke(chain[2])
+        # Keep A and C warm for 30 mins while B goes cold
+        wait_with_ping(client, 30, [chain[0], chain[2]])
         
-        wait_for_recycle(30)
-        
-        # Pre-warm A and C
-        client.invoke(chain[0])
-        client.invoke(chain[2])
-        
+        # Now B should be cold, A and C warm
         res = executor.execute_chain(chain, ping_others=True)
         logger.log_workflow('scenario_D', res)
 
