@@ -7,6 +7,7 @@ FUNCTIONS=("function_a" "function_b" "function_c" "function_d")
 MEMORIES=("512" "1024" "256" "512")
 
 # Create a deployment package
+rm -rf build
 mkdir -p build
 cp common/utils.py build/
 
