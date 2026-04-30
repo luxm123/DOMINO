@@ -22,6 +22,9 @@ exp1_tau:
 exp1_scenarios:
 	$(PYTHON) experiments/exp1_calibration/run_workflow_scenarios.py
 
+exp2:
+	$(PYTHON) experiments/exp2_performance/run_baselines.py
+
 clean:
 	rm -rf functions/build
 	find . -type d -name "__pycache__" -exec rm -rf {} +
