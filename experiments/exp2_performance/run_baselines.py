@@ -65,9 +65,19 @@ def run_experiment_2(count=200):
                 executor.start_keep_alive(all_funcs)
             
             for i in tqdm(range(count)):
-                # For realistic comparison, we might want to ensure some cold starts
-                # but for a general benchmark, we run them sequentially.
-                # To simulate real-world inter-arrival, we could add a small sleep.
+                # Force cold start for all functions in the DAG except for Keep-Alive
+                if strategy != WarmupStrategy.KEEP_ALIVE:
+                    # Get nodes involved in current DAG
+                    nodes_to_reset = list(dag['nodes'].keys())
+                    # Parallel reset to save time
+                    threads = []
+                    for node in nodes_to_reset:
+                        t = threading.Thread(target=client.force_cold_start, args=(node,))
+                        t.start()
+                        threads.append(t)
+                    for t in threads:
+                        t.join()
+
                 res = executor.execute_dag(dag, strategy=strategy)
                 logger.log_workflow(f"exp2_{wf_name}_{strategy}", res)
                 time.sleep(1) # Gap between runs

@@ -13,6 +13,29 @@ class LambdaClient:
         )
         self.client = boto3.client('lambda', region_name=region_name, config=config)
 
+    def force_cold_start(self, function_name):
+        """
+        Force a cold start by updating function environment variables.
+        """
+        try:
+            # Add or update a dummy environment variable to force a new deployment
+            import uuid
+            self.client.update_function_configuration(
+                FunctionName=function_name,
+                Environment={
+                    'Variables': {
+                        'FORCE_COLD_START': str(uuid.uuid4())
+                    }
+                }
+            )
+            # Wait for the function to finish updating
+            waiter = self.client.get_waiter('function_updated')
+            waiter.wait(FunctionName=function_name)
+            return True
+        except Exception as e:
+            print(f"Error forcing cold start for {function_name}: {e}")
+            return False
+
     def invoke(self, function_name, payload=None, async_invoke=False):
         """
         Invoke a Lambda function.
