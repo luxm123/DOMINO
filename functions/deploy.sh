@@ -13,18 +13,14 @@ EXP2_FUNCS=("v_a" "v_b" "v_c" "i_a" "i_b" "i_c" "i_d" "e_a" "e_b" "e_c" "e_d")
 EXP2_MEMS=("512" "1024" "512" "512" "1024" "1024" "512" "512" "512" "512" "512")
 
 deploy_group() {
-    local funcs=("$@")
-    local mems_name="${funcs_name}_MEMS[@]"
     local group_name=$1
-    shift
-    local -a funcs=("${!1}")
-    shift
-    local -a mems=("${!1}")
-    local handler_path=$1
+    local -a funcs=("${!2}")
+    local -a mems=("${!3}")
+    local handler_path=$4
 
     mkdir -p build
     cp common/utils.py build/
-    cp $handler_path build/lambda_handler.py
+    cp "$handler_path" build/lambda_handler.py
 
     for i in "${!funcs[@]}"; do
         FUNC_NAME=${funcs[$i]}
