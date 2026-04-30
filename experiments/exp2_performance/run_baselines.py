@@ -13,7 +13,7 @@ from orchestrator.event_logger import EventLogger
 
 # Workflow Definitions
 WORKFLOWS = {
-    'video': {
+    'chain': {
         'start_node': 'v_a',
         'nodes': {
             'v_a': {'next': ['v_b']},
@@ -21,7 +21,7 @@ WORKFLOWS = {
             'v_c': {'next': []}
         }
     },
-    'image': {
+    'fanout': {
         'start_node': 'i_a',
         'nodes': {
             'i_a': {'next': ['i_b', 'i_c']},
@@ -30,7 +30,7 @@ WORKFLOWS = {
             'i_d': {'next': []}
         }
     },
-    'ecommerce': {
+    'branch': {
         'start_node': 'e_a',
         'nodes': {
             'e_a': {'next': ['e_b', 'e_c'], 'prob': [0.5, 0.5]},
