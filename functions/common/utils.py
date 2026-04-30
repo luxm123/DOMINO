@@ -2,10 +2,10 @@ import time
 import json
 import os
 
-# --- ARTIFICIAL COLD START PENALTY ---
-# This global variable persists as long as the container is warm.
-# If it's True, it means this is a fresh container (Cold Start).
+# --- ARTIFICIAL COLD START PARAMETERS ---
 _IS_COLD = True
+_LAST_INVOKE_TIME = 0
+SIMULATED_TAU_SEC = 120  # 2 minutes: very aggressive recycle window to force propagation
 
 def simulate_work(duration_ms):
     """
@@ -13,22 +13,28 @@ def simulate_work(duration_ms):
     """
     start_time = time.time()
     while (time.time() - start_time) * 1000 < duration_ms:
-        # Busy wait to simulate CPU work
         _ = 1 + 1
 
 def get_response(event, context, duration_ms):
-    global _IS_COLD
+    global _IS_COLD, _LAST_INVOKE_TIME
+    
+    now = time.time()
     is_warmup = event.get('warmup', False)
     
-    # Identify if this is a real cold start
-    actual_cold = _IS_COLD
+    # Logic to identify artificial cold start:
+    # 1. Real cold start (first time global scope is executed)
+    # 2. Simulated cold start (idle time > threshold)
+    idle_time = now - _LAST_INVOKE_TIME if _LAST_INVOKE_TIME > 0 else 0
     
-    # Simulate heavy initialization penalty (e.g., loading a large ML model)
-    # only for the very first call to this container.
-    if actual_cold:
+    should_sim_cold = _IS_COLD or (idle_time > SIMULATED_TAU_SEC)
+    
+    if should_sim_cold:
         # Artificial penalty: 3 seconds
         time.sleep(3)
         _IS_COLD = False
+    
+    # Always update last invoke time, even for warmup calls
+    _LAST_INVOKE_TIME = time.time()
     
     if not is_warmup:
         simulate_work(duration_ms)
@@ -39,8 +45,8 @@ def get_response(event, context, duration_ms):
             'function_name': os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'unknown'),
             'duration_ms': duration_ms if not is_warmup else 0,
             'is_warmup': is_warmup,
-            'was_cold': actual_cold, # Report back if it was a cold start
-            'memory_limit_mb': context.memory_limit_in_mb,
+            'was_cold': should_sim_cold,
+            'idle_time_sec': round(idle_time, 2),
             'request_id': context.aws_request_id
         })
     }
