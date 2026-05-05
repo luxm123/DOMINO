@@ -36,18 +36,13 @@ class EventLogger:
 
         # To handle dynamic keys (especially in 'branch' workflow), 
         # we read existing headers if file exists.
-        if file_exists:
-            with open(file_path, 'r', newline='') as f:
-                existing_headers = next(csv.reader(f))
-                # Add any new keys found in this row to headers (not ideal for CSV but robust)
-                new_keys = [k for k in row.keys() if k not in existing_headers]
-                if new_keys:
-                    # If there are new keys, we have a problem with DictWriter.
-                    # A better way is to use pandas for append or just accept that 
-                    # branch workflows should have all possible node headers pre-defined.
-                    # For now, let's just use the current row's keys and hope for the best,
-                    # or fill missing keys with None.
-                    pass
+        if file_exists and os.path.getsize(file_path) > 0:
+            try:
+                with open(file_path, 'r', newline='') as f:
+                    reader = csv.reader(f)
+                    existing_headers = next(reader, None)
+            except Exception:
+                existing_headers = None
 
         with open(file_path, 'a', newline='') as f:
             # We use all keys in 'row' to ensure nothing is lost. 
