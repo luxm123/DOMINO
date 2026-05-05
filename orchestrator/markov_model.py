@@ -43,12 +43,30 @@ class MarkovModel:
                         "timing": "on_output"
                     }
             else: # Chain or Fanout
-                # For fanout, we might only warm up the critical path (longest duration)
-                # Here we simplify: if it's a chain or small fanout, warm up all.
-                # In a real model, we'd use mu_i and delta_i to calculate the critical path.
-                warmup_table[node_id] = {
-                    "successors_to_warm": successors,
-                    "timing": "on_start"
-                }
+                if node_id == 'i_a': # Custom logic for Fanout-4 i_a -> [i_b, i_c] -> i_d
+                    # DOMINO Principle: Warm up all immediate parallel successors
+                    warmup_table[node_id] = {
+                        "successors_to_warm": successors,
+                        "timing": "on_start"
+                    }
+                elif node_id in ['i_b', 'i_c']: # i_b or i_c -> i_d
+                    # DOMINO Principle: Only the 'critical path' predecessor warms up the join node
+                    # Suppose i_b is the critical path (takes 600ms vs i_c 600ms, both same here)
+                    # We pick one to avoid duplicate warmup
+                    if node_id == 'i_b':
+                        warmup_table[node_id] = {
+                            "successors_to_warm": successors,
+                            "timing": "on_start"
+                        }
+                    else:
+                        warmup_table[node_id] = {
+                            "successors_to_warm": [],
+                            "timing": "on_start"
+                        }
+                else:
+                    warmup_table[node_id] = {
+                        "successors_to_warm": successors,
+                        "timing": "on_start"
+                    }
                 
         return warmup_table

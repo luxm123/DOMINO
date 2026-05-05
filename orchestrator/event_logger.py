@@ -15,10 +15,17 @@ class EventLogger:
         file_path = os.path.join(self.output_dir, f"{experiment_name}.csv")
         file_exists = os.path.exists(file_path)
         
+        # Calculate warmup count
+        warmup_count = sum(1 for step in data['steps'] if step.get('is_warmup') is True)
+        # Note: In our current logic, we also need to count async warmup calls 
+        # that might not be in the 'steps' list. Let's add a explicit field.
+        total_warmup_calls = data.get('warmup_call_count', 0)
+
         # Flatten data for CSV
         row = {
             'timestamp': time.time(),
-            'total_latency_ms': data['total_latency_ms']
+            'total_latency_ms': data['total_latency_ms'],
+            'warmup_call_count': total_warmup_calls
         }
         
         for i, step in enumerate(data['steps']):

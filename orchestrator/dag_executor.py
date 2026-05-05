@@ -34,8 +34,9 @@ class DAGExecutor:
     def execute_dag(self, dag_config, strategy=WarmupStrategy.VANILLA, model_params=None):
         results = {}
         workflow_start = time.time()
+        warmup_call_count = 0
         
-        # DOMINO Step 1: Offline analysis (done once per execution here for simplicity)
+        # DOMINO Step 1: Offline analysis
         warmup_table = {}
         if strategy == WarmupStrategy.DOMINO:
             model = MarkovModel(dag_config, model_params)
@@ -47,25 +48,27 @@ class DAGExecutor:
         
         while current_nodes:
             next_level = []
-            
-            # Execute current level (supporting parallel fan-out)
             level_threads = []
             level_results = []
+            
+            # Counter for this level's warmups
+            level_warmup_lock = threading.Lock()
+            nonlocal_warmup_count = [0] 
 
             def run_node(node_id):
                 # Pre-warmup Logic
                 if strategy == WarmupStrategy.ORION:
-                    # ORION Rule: Warm up all direct successors on start
                     successors = dag_config['nodes'].get(node_id, {}).get('next', [])
                     for succ in successors:
                         self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
+                        with level_warmup_lock: nonlocal_warmup_count[0] += 1
                 
                 elif strategy == WarmupStrategy.DOMINO:
-                    # DOMINO Rule: Consult warmup table
                     warmup_info = warmup_table.get(node_id)
                     if warmup_info and warmup_info["timing"] == "on_start":
                         for succ in warmup_info["successors_to_warm"]:
                             self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
+                            with level_warmup_lock: nonlocal_warmup_count[0] += 1
 
                 # Execute
                 step_start = time.time()
@@ -75,22 +78,20 @@ class DAGExecutor:
                 res['latency_ms'] = (step_end - step_start) * 1000
                 level_results.append(res)
                 
-                # Post-execution warmup (DOMINO 'on_output' or ORION implicit)
+                # Post-execution warmup
                 node_config = dag_config['nodes'].get(node_id, {})
                 successors = node_config.get('next', [])
                 
-                # Branch decision
                 if successors:
                     probs = node_config.get('prob')
                     if probs: # Branch
                         chosen = random.choices(successors, weights=probs, k=1)[0]
                         next_level.append(chosen)
-                        # DOMINO 'on_output' logic
                         if strategy == WarmupStrategy.DOMINO:
                             warmup_info = warmup_table.get(node_id)
                             if warmup_info and warmup_info["timing"] == "on_output":
-                                # Only warm up the chosen branch
                                 self.client.invoke(chosen, payload=self.warmup_marker, async_invoke=True)
+                                with level_warmup_lock: nonlocal_warmup_count[0] += 1
                     else: # Chain or Fanout
                         next_level.extend(successors)
 
@@ -104,18 +105,16 @@ class DAGExecutor:
             for t in level_threads:
                 t.join()
             
+            warmup_call_count += nonlocal_warmup_count[0]
             for r in level_results:
                 results[r['node']] = r
-                
             current_nodes = list(set(next_level))
 
         workflow_end = time.time()
         
-        # Flatten results for logging
-        steps_list = list(results.values())
-        
         return {
             'total_latency_ms': (workflow_end - workflow_start) * 1000,
-            'steps': steps_list,
-            'strategy': strategy
+            'steps': list(results.values()),
+            'strategy': strategy,
+            'warmup_call_count': warmup_call_count
         }

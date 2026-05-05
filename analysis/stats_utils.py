@@ -17,12 +17,15 @@ def calculate_stats(latencies):
 
 def load_exp2_data(data_dir, workflow, strategy):
     """
-    Load total_latency_ms from CSV for a given workflow and strategy.
+    Load total_latency_ms and warmup_call_count from CSV.
     """
     file_path = f"{data_dir}/exp2_{workflow}_{strategy}.csv"
     try:
         df = pd.read_csv(file_path)
-        return df['total_latency_ms'].tolist()
+        return {
+            'latencies': df['total_latency_ms'].tolist(),
+            'warmup_calls': df['warmup_call_count'].tolist() if 'warmup_call_count' in df.columns else [0]*len(df)
+        }
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
-        return []
+        return {'latencies': [], 'warmup_calls': []}
