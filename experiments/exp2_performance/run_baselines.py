@@ -78,6 +78,9 @@ def run_experiment_2(count=200):
                         threads.append(t)
                     for t in threads:
                         t.join()
+                    
+                    # Give AWS a moment to stabilize after parallel updates
+                    time.sleep(2)
 
                 res = executor.execute_dag(dag, strategy=strategy)
                 logger.log_workflow(f"exp2_{wf_name}_{strategy}", res)

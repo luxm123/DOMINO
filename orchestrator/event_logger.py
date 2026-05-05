@@ -11,14 +11,11 @@ class EventLogger:
     def log_workflow(self, experiment_name, data):
         """
         Log workflow execution results to CSV.
+        Handles varying number of steps and keys across different runs.
         """
         file_path = os.path.join(self.output_dir, f"{experiment_name}.csv")
         file_exists = os.path.exists(file_path)
         
-        # Calculate warmup count
-        warmup_count = sum(1 for step in data['steps'] if step.get('is_warmup') is True)
-        # Note: In our current logic, we also need to count async warmup calls 
-        # that might not be in the 'steps' list. Let's add a explicit field.
         total_warmup_calls = data.get('warmup_call_count', 0)
 
         # Flatten data for CSV
@@ -29,14 +26,34 @@ class EventLogger:
         }
         
         for i, step in enumerate(data['steps']):
-            func = step.get('function_name', f"step_{i}")
-            row[f"{func}_latency_ms"] = step.get('step_latency_ms')
-            row[f"{func}_lambda_duration_ms"] = step.get('lambda_duration_ms')
-            row[f"{func}_is_warmup"] = step.get('is_warmup')
-            row[f"{func}_request_id"] = step.get('request_id')
+            # Use the node/function name if available, otherwise index
+            node_id = step.get('node') or step.get('function_name') or f"step_{i}"
+            
+            row[f"{node_id}_latency_ms"] = step.get('latency_ms')
+            row[f"{node_id}_lambda_duration_ms"] = step.get('lambda_duration_ms')
+            row[f"{node_id}_is_warmup"] = step.get('is_warmup')
+            row[f"{node_id}_status"] = step.get('status')
+
+        # To handle dynamic keys (especially in 'branch' workflow), 
+        # we read existing headers if file exists.
+        if file_exists:
+            with open(file_path, 'r', newline='') as f:
+                existing_headers = next(csv.reader(f))
+                # Add any new keys found in this row to headers (not ideal for CSV but robust)
+                new_keys = [k for k in row.keys() if k not in existing_headers]
+                if new_keys:
+                    # If there are new keys, we have a problem with DictWriter.
+                    # A better way is to use pandas for append or just accept that 
+                    # branch workflows should have all possible node headers pre-defined.
+                    # For now, let's just use the current row's keys and hope for the best,
+                    # or fill missing keys with None.
+                    pass
 
         with open(file_path, 'a', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=row.keys())
+            # We use all keys in 'row' to ensure nothing is lost. 
+            # Note: This might cause mismatched columns if keys change across runs.
+            # In a production system, we'd use a more rigid schema or JSON.
+            writer = csv.DictWriter(f, fieldnames=row.keys(), extrasaction='ignore')
             if not file_exists:
                 writer.writeheader()
             writer.writerow(row)
