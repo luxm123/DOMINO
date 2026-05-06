@@ -5,7 +5,7 @@ import os
 # --- ARTIFICIAL COLD START PARAMETERS ---
 _IS_COLD = True
 _LAST_INVOKE_TIME = 0
-SIMULATED_TAU_SEC = 120  # 2 minutes: very aggressive recycle window to force propagation
+SIMULATED_TAU_SEC = 60  # 1 minute: more aggressive recycle window to force propagation
 
 def simulate_work(duration_ms):
     """
@@ -29,8 +29,8 @@ def get_response(event, context, duration_ms):
     should_sim_cold = _IS_COLD or (idle_time > SIMULATED_TAU_SEC)
     
     if should_sim_cold:
-        # Artificial penalty: 3 seconds
-        time.sleep(3)
+        # Artificial penalty: 5 seconds (increased from 3s to amplify impact)
+        time.sleep(5)
         _IS_COLD = False
     
     # Always update last invoke time, even for warmup calls

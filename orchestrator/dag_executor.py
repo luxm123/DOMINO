@@ -66,9 +66,21 @@ class DAGExecutor:
                 elif strategy == WarmupStrategy.DOMINO:
                     warmup_info = warmup_table.get(node_id)
                     if warmup_info and warmup_info["timing"] == "on_start":
-                        for succ in warmup_info["successors_to_warm"]:
-                            self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
-                            with level_warmup_lock: nonlocal_warmup_count[0] += 1
+                        delay = warmup_info.get("delay_ms", 0)
+                        
+                        def delayed_warmup(funcs, d):
+                            if d > 0:
+                                time.sleep(d / 1000.0)
+                            for succ in funcs:
+                                self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
+                        
+                        if delay > 0:
+                            threading.Thread(target=delayed_warmup, args=(warmup_info["successors_to_warm"], delay)).start()
+                            with level_warmup_lock: nonlocal_warmup_count[0] += len(warmup_info["successors_to_warm"])
+                        else:
+                            for succ in warmup_info["successors_to_warm"]:
+                                self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
+                                with level_warmup_lock: nonlocal_warmup_count[0] += 1
 
                 # Execute
                 step_start = time.time()

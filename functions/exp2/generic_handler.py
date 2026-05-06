@@ -12,14 +12,14 @@ except ImportError:
 def lambda_handler(event, context):
     func_name = os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'unknown')
     
-    # Define durations for Exp 2 functions
+    # Define durations for Exp 2 functions (Increased for Direction 2)
     durations = {
         # Video
-        'v_a': 500, 'v_b': 800, 'v_c': 300,
+        'v_a': 2000, 'v_b': 1000, 'v_c': 500,
         # Image
-        'i_a': 400, 'i_b': 600, 'i_c': 600, 'i_d': 300,
+        'i_a': 2000, 'i_b': 800, 'i_c': 800, 'i_d': 500,
         # E-commerce
-        'e_a': 300, 'e_b': 500, 'e_c': 500, 'e_d': 400
+        'e_a': 2000, 'e_b': 1000, 'e_c': 1000, 'e_d': 800
     }
     
     duration = durations.get(func_name, 500)
