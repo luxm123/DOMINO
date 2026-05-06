@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Ensure we are in the script's directory
+cd "$(dirname "$0")"
+
 # Configuration
 REGION="us-east-1"
 ROLE_ARN="arn:aws:iam::953334886326:role/domino-lambda-role"
