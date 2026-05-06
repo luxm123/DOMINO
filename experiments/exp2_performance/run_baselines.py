@@ -62,10 +62,26 @@ def run_experiment_2(count=200):
         for strategy in strategies:
             print(f"  Strategy: {strategy}")
             
+            # --- Resume Logic: Check if we already have data ---
+            csv_path = f"data/exp2/exp2_{wf_name}_{strategy}.csv"
+            existing_count = 0
+            if os.path.exists(csv_path):
+                try:
+                    df_existing = pd.read_csv(csv_path)
+                    existing_count = len(df_existing)
+                except:
+                    existing_count = 0
+            
+            if existing_count >= count:
+                print(f"  Already finished {existing_count} runs for {strategy}. Skipping.")
+                continue
+            elif existing_count > 0:
+                print(f"  Resuming {strategy} from {existing_count}/{count}...")
+
             if strategy == WarmupStrategy.KEEP_ALIVE:
                 executor.start_keep_alive(all_funcs)
             
-            for i in tqdm(range(count)):
+            for i in tqdm(range(existing_count, count)):
                 # Force cold start for all functions in the DAG except for Keep-Alive
                 if strategy != WarmupStrategy.KEEP_ALIVE:
                     # Get nodes involved in current DAG
