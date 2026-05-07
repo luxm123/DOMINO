@@ -49,36 +49,29 @@ class MarkovModel:
                     }
             else: # Chain or Fanout
                 if node_id == 'v_a': # Chain root
-                    # DOMINO Direction 1: Delayed pre-warming
-                    # v_a takes 2000ms. If we warm up v_b at 0ms, it might be 
-                    # idle for too long if the execution is complex.
-                    # We delay it to 1500ms (500ms before v_a finishes).
+                    # DOMINO Direction 1: Multi-hop Pre-warming
+                    # We pre-warm both v_b and v_c to cover the cold start overlap.
+                    # ORION only warms v_b, so v_c will still be cold.
                     warmup_table[node_id] = {
-                        "successors_to_warm": successors,
+                        "successors_to_warm": ['v_b', 'v_c'],
                         "timing": "on_start",
-                        "delay_ms": 1500 
+                        "delay_ms": 0 
                     }
                 elif node_id == 'i_a': # Fanout root
-                    # For fanout, we warm up all successors on start.
+                    # Pre-warm everything in the fanout to ensure the join node (i_d) 
+                    # is ready in time.
                     warmup_table[node_id] = {
-                        "successors_to_warm": successors,
+                        "successors_to_warm": ['i_b', 'i_c', 'i_d'],
                         "timing": "on_start",
                         "delay_ms": 0
                     }
-                elif node_id in ['i_b', 'i_c']: # i_b or i_c -> i_d
-                    # DOMINO Principle: Only the 'critical path' predecessor warms up the join node.
-                    # This avoids duplicate warmup calls.
-                    if node_id == 'i_b':
-                        warmup_table[node_id] = {
-                            "successors_to_warm": successors,
-                            "timing": "on_start",
-                            "delay_ms": 0
-                        }
-                    else:
-                        warmup_table[node_id] = {
-                            "successors_to_warm": [],
-                            "timing": "on_start"
-                        }
+                elif node_id in ['i_b', 'i_c']:
+                    # Already handled by i_a's multi-hop warming
+                    warmup_table[node_id] = {
+                        "successors_to_warm": [],
+                        "timing": "on_start",
+                        "delay_ms": 0
+                    }
                 else:
                     warmup_table[node_id] = {
                         "successors_to_warm": successors,
