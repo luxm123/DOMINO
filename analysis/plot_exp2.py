@@ -20,30 +20,51 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
     
     for idx, wf in enumerate(workflows):
         ax = axes[idx]
+        ax2 = ax.twinx() # Create a twin axis for warmup counts
+        
         x = np.arange(len(strategies))
         width = 0.25
         
         p50s, p95s, p99s = [], [], []
+        avg_warmups = []
         
         for strategy in strategies:
             data = load_exp2_data(data_dir, wf, strategy)
             latencies = data['latencies']
+            warmups = data['warmup_calls']
+            
             stats = calculate_stats(latencies)
-            p50s.append(stats['p50'] / 1000.0) # Convert to seconds
+            p50s.append(stats['p50'] / 1000.0) 
             p95s.append(stats['p95'] / 1000.0)
             p99s.append(stats['p99'] / 1000.0)
+            avg_warmups.append(sum(warmups) / len(warmups) if warmups else 0)
         
-        ax.bar(x - width, p50s, width, label='P50', color='#A6CEE3')
-        ax.bar(x, p95s, width, label='P95', color='#1F78B4')
-        ax.bar(x + width, p99s, width, label='P99', color='#B2DF8A')
+        # Plot Latencies (Left Axis)
+        ax.bar(x - width, p50s, width, label='P50 (Latency)', color='#A6CEE3', alpha=0.8)
+        ax.bar(x, p95s, width, label='P95 (Latency)', color='#1F78B4', alpha=0.8)
+        ax.bar(x + width, p99s, width, label='P99 (Latency)', color='#B2DF8A', alpha=0.8)
         
-        ax.set_title(f'Workflow: {wf.capitalize()}', fontsize=14)
+        # Plot Warmups (Right Axis)
+        ax2.plot(x, avg_warmups, color='red', marker='D', linestyle='-', linewidth=2, label='Avg Warmups', markersize=8)
+        ax2.set_ylabel('Avg Warmup Calls', color='red', fontsize=12)
+        ax2.tick_params(axis='y', labelcolor='red')
+        
+        # Ensure red line is visible by setting y-axis limits slightly above max
+        max_warmup = max(avg_warmups) if avg_warmups else 5
+        ax2.set_ylim(0, max_warmup + 1) 
+        
+        ax.set_title(f'Workflow: {wf.capitalize()}', fontsize=14, fontweight='bold')
         ax.set_ylabel('End-to-End Latency (s)', fontsize=12)
         ax.set_xticks(x)
         ax.set_xticklabels([s.upper() for s in strategies], rotation=15)
+        
         if idx == 0:
-            ax.legend()
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
+            # Combine legends
+            lines, labels = ax.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax.legend(lines + lines2, labels + labels2, loc='upper right', fontsize=10)
+        
+        ax.grid(axis='y', linestyle='--', alpha=0.5)
 
     plt.tight_layout()
     plt.savefig(f'{output_dir}/exp2_performance_comparison.png', dpi=300)
