@@ -16,25 +16,43 @@ class LambdaClient:
     def force_cold_start(self, function_name):
         """
         Force a cold start by updating function environment variables.
+        Includes robust retry for ResourceConflict and Throttling.
         """
-        try:
-            # Add or update a dummy environment variable to force a new deployment
-            import uuid
-            self.client.update_function_configuration(
-                FunctionName=function_name,
-                Environment={
-                    'Variables': {
-                        'FORCE_COLD_START': str(uuid.uuid4())
+        import uuid
+        import time
+        import random
+
+        max_retries = 10
+        for attempt in range(max_retries):
+            try:
+                self.client.update_function_configuration(
+                    FunctionName=function_name,
+                    Environment={
+                        'Variables': {
+                            'FORCE_COLD_START': str(uuid.uuid4())
+                        }
                     }
-                }
-            )
-            # Wait for the function to finish updating
-            waiter = self.client.get_waiter('function_updated')
-            waiter.wait(FunctionName=function_name)
-            return True
-        except Exception as e:
-            print(f"Error forcing cold start for {function_name}: {e}")
-            return False
+                )
+                # Wait for the function to finish updating
+                waiter = self.client.get_waiter('function_updated')
+                waiter.wait(
+                    FunctionName=function_name,
+                    WaiterConfig={'Delay': 2, 'MaxAttempts': 30}
+                )
+                return True
+            except (self.client.exceptions.ResourceConflictException, 
+                    self.client.exceptions.TooManyRequestsException,
+                    self.client.exceptions.ServiceException) as e:
+                if attempt < max_retries - 1:
+                    # Exponential backoff with jitter
+                    sleep_time = (2 ** attempt) + random.random()
+                    time.sleep(sleep_time)
+                else:
+                    print(f"Max retries reached for {function_name}: {e}")
+                    return False
+            except Exception as e:
+                print(f"Unexpected error forcing cold start for {function_name}: {e}")
+                return False
 
     def invoke(self, function_name, payload=None, async_invoke=False):
         """
