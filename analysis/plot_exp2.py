@@ -26,7 +26,8 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
         p50s, p95s, p99s = [], [], []
         
         for strategy in strategies:
-            latencies = load_exp2_data(data_dir, wf, strategy)
+            data = load_exp2_data(data_dir, wf, strategy)
+            latencies = data['latencies']
             stats = calculate_stats(latencies)
             p50s.append(stats['p50'] / 1000.0) # Convert to seconds
             p95s.append(stats['p95'] / 1000.0)
