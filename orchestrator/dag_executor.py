@@ -102,8 +102,11 @@ class DAGExecutor:
                         if strategy == WarmupStrategy.DOMINO:
                             warmup_info = warmup_table.get(node_id)
                             if warmup_info and warmup_info["timing"] == "on_output":
-                                self.client.invoke(chosen, payload=self.warmup_marker, async_invoke=True)
-                                with level_warmup_lock: nonlocal_warmup_count[0] += 1
+                                # DOMINO Optimization: Only invoke if we actually need to warm up.
+                                # This avoids network overhead for non-pre-warmable paths.
+                                if chosen in warmup_info.get("successors_to_warm", successors):
+                                    self.client.invoke(chosen, payload=self.warmup_marker, async_invoke=True)
+                                    with level_warmup_lock: nonlocal_warmup_count[0] += 1
                     else: # Chain or Fanout
                         next_level.extend(successors)
 

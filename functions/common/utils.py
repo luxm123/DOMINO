@@ -15,7 +15,7 @@ def simulate_work(duration_ms):
     while (time.time() - start_time) * 1000 < duration_ms:
         _ = 1 + 1
 
-def get_response(event, context, duration_ms):
+def get_response(event, context, duration_ms, init_penalty_ms=5000):
     global _IS_COLD, _LAST_INVOKE_TIME
     
     now = time.time()
@@ -29,8 +29,8 @@ def get_response(event, context, duration_ms):
     should_sim_cold = _IS_COLD or (idle_time > SIMULATED_TAU_SEC)
     
     if should_sim_cold:
-        # Artificial penalty: 5 seconds (increased from 3s to amplify impact)
-        time.sleep(5)
+        # Realistic initialization penalty (e.g., loading heavy libraries)
+        time.sleep(init_penalty_ms / 1000.0)
         _IS_COLD = False
     
     # Always update last invoke time, even for warmup calls

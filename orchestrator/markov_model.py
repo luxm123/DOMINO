@@ -27,26 +27,26 @@ class MarkovModel:
             # 3. Branch: Warm up high-probability successor on start, 
             #    OR wait for output signal if probabilities are close.
             
-            if probs: # Conditional Branch
-                # DOMINO Direction 1: Cost-efficient branching
-                # If one branch is significantly more likely (> 0.7), warm it up on start
-                # Otherwise, use 'on_output' to wait for the actual branch decision.
-                # This saves 1 warmup call compared to ORION which warms both.
-                max_prob = max(probs)
-                if max_prob > 0.7:
-                    idx = probs.index(max_prob)
-                    warmup_table[node_id] = {
-                        "successors_to_warm": [successors[idx]],
-                        "timing": "on_start",
-                        "delay_ms": 0
-                    }
-                else:
-                    # For 0.5/0.5 branches, we wait for output to be precise.
-                    # This is more cost-efficient than ORION.
-                    warmup_table[node_id] = {
-                        "successors_to_warm": successors,
-                        "timing": "on_output"
-                    }
+            if probs: # Branch
+                    # DOMINO Direction 1: Cost-efficient branching
+                    # If one branch is significantly more likely (> 0.7), warm it up on start.
+                    # Otherwise, use 'on_output' to wait for the actual branch decision.
+                    # This avoids network calls to the wrong branch entirely.
+                    max_prob = max(probs)
+                    if max_prob > 0.7:
+                        idx = probs.index(max_prob)
+                        warmup_table[node_id] = {
+                            "successors_to_warm": [successors[idx]],
+                            "timing": "on_start",
+                            "delay_ms": 0
+                        }
+                    else:
+                        # For 0.5/0.5 branches, we wait for output to be precise.
+                        # This avoids any pre-warmup calls until the branch is chosen.
+                        warmup_table[node_id] = {
+                            "successors_to_warm": [], # IMPORTANT: Empty list here
+                            "timing": "on_output"     # Execution logic will handle chosen successor
+                        }
             else: # Chain or Fanout
                 if node_id == 'v_a': # Chain root
                     # DOMINO Direction 1: Multi-hop Pre-warming
