@@ -86,17 +86,16 @@ def run_experiment_2(count=200):
                 if strategy != WarmupStrategy.KEEP_ALIVE:
                     # Get nodes involved in current DAG
                     nodes_to_reset = list(dag['nodes'].keys())
-                    # Parallel reset to save time
-                    threads = []
-                    for node in nodes_to_reset:
-                        t = threading.Thread(target=client.force_cold_start, args=(node,))
-                        t.start()
-                        threads.append(t)
-                    for t in threads:
-                        t.join()
                     
-                    # Give AWS a moment to stabilize after parallel updates
-                    time.sleep(2)
+                    # DOMINO Fix: Use serial reset instead of parallel to avoid AWS ResourceConflictException.
+                    # AWS Lambda does not allow concurrent UpdateFunctionConfiguration calls on the same account/region easily.
+                    for node in nodes_to_reset:
+                        success = client.force_cold_start(node)
+                        if not success:
+                            print(f"  Warning: Failed to reset {node} after retries.")
+                    
+                    # Give AWS a moment to stabilize after updates
+                    time.sleep(3)
 
                 res = executor.execute_dag(dag, strategy=strategy)
                 logger.log_workflow(f"exp2_{wf_name}_{strategy}", res)
