@@ -112,6 +112,7 @@ class LambdaClient:
                     'duration_ms': (end_time - start_time) * 1000,
                     'lambda_duration_ms': body.get('duration_ms'),
                     'is_warmup': body.get('is_warmup', False),
+                    'was_cold': body.get('was_cold', False), # Added was_cold
                     'request_id': response.get('ResponseMetadata', {}).get('RequestId')
                 }
             except self.client.exceptions.ResourceConflictException:

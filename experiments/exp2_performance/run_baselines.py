@@ -95,9 +95,17 @@ def run_experiment_2(count=200):
                             print(f"  Warning: Failed to reset {node} after retries.")
                     
                     # Give AWS a moment to stabilize after updates
-                    time.sleep(3)
+                    # Increased to 10s to ensure the new "cold" fleet is ready.
+                    time.sleep(10)
 
                 res = executor.execute_dag(dag, strategy=strategy)
+                
+                # Check for "False Cold Starts" in Vanilla strategy
+                if strategy == WarmupStrategy.VANILLA:
+                    cold_failures = [s['node'] for s in res['steps'] if not s.get('was_cold')]
+                    if cold_failures:
+                        print(f"  Warning: Vanilla run {i} had False Cold Starts for: {cold_failures}")
+
                 logger.log_workflow(f"exp2_{wf_name}_{strategy}", res)
                 time.sleep(1) # Gap between runs
                 
