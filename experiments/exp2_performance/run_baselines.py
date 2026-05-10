@@ -95,8 +95,8 @@ def run_experiment_2(count=200):
                             print(f"  Warning: Failed to reset {node} after retries.")
                     
                     # Give AWS a moment to stabilize after updates
-                    # Increased to 10s to ensure the new "cold" fleet is ready.
-                    time.sleep(10)
+                    # Increased to 20s to ensure the new "cold" fleet is truly ready.
+                    time.sleep(20)
 
                 res = executor.execute_dag(dag, strategy=strategy)
                 

@@ -25,26 +25,30 @@ class LambdaClient:
         max_retries = 10
         for attempt in range(max_retries):
             try:
+                # Get current config to avoid wiping other important env vars if any
+                response = self.client.get_function_configuration(FunctionName=function_name)
+                current_env = response.get('Environment', {'Variables': {}}).get('Variables', {})
+                
+                # Update with a new unique variable to force container replacement
+                current_env['FORCE_COLD_START'] = str(uuid.uuid4())
+                current_env['LAST_RESET_TIME'] = str(time.time())
+
                 self.client.update_function_configuration(
                     FunctionName=function_name,
-                    Environment={
-                        'Variables': {
-                            'FORCE_COLD_START': str(uuid.uuid4())
-                        }
-                    }
+                    Environment={'Variables': current_env}
                 )
+                
                 # Wait for the function to finish updating
                 waiter = self.client.get_waiter('function_updated')
                 waiter.wait(
                     FunctionName=function_name,
-                    WaiterConfig={'Delay': 2, 'MaxAttempts': 30}
+                    WaiterConfig={'Delay': 2, 'MaxAttempts': 60} # Increased max attempts
                 )
                 return True
             except (self.client.exceptions.ResourceConflictException, 
                     self.client.exceptions.TooManyRequestsException,
                     self.client.exceptions.ServiceException) as e:
                 if attempt < max_retries - 1:
-                    # Exponential backoff with jitter
                     sleep_time = (2 ** attempt) + random.random()
                     time.sleep(sleep_time)
                 else:
