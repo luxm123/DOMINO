@@ -15,47 +15,43 @@ class LambdaClient:
 
     def force_cold_start(self, function_name):
         """
-        Force a cold start by updating function environment variables.
-        Includes robust retry for ResourceConflict and Throttling.
+        Force a cold start by toggling function memory size.
+        This is the most aggressive way to force AWS to destroy all existing containers.
         """
-        import uuid
         import time
         import random
 
         max_retries = 10
         for attempt in range(max_retries):
             try:
-                # Get current config to avoid wiping other important env vars if any
+                # 1. Get current memory size
                 response = self.client.get_function_configuration(FunctionName=function_name)
-                current_env = response.get('Environment', {'Variables': {}}).get('Variables', {})
+                current_mem = response['MemorySize']
                 
-                # Update with a new unique variable to force container replacement
-                current_env['FORCE_COLD_START'] = str(uuid.uuid4())
-                current_env['LAST_RESET_TIME'] = str(time.time())
-
+                # 2. Change memory size slightly (toggle between X and X+64)
+                # AWS MUST provision new containers when memory limits change.
+                new_mem = current_mem + 64 if current_mem < 2048 else current_mem - 64
+                
                 self.client.update_function_configuration(
                     FunctionName=function_name,
-                    Environment={'Variables': current_env}
+                    MemorySize=new_mem
                 )
                 
-                # Wait for the function to finish updating
+                # 3. Wait for the function to finish updating
                 waiter = self.client.get_waiter('function_updated')
                 waiter.wait(
                     FunctionName=function_name,
-                    WaiterConfig={'Delay': 2, 'MaxAttempts': 60} # Increased max attempts
+                    WaiterConfig={'Delay': 2, 'MaxAttempts': 60}
                 )
                 return True
             except (self.client.exceptions.ResourceConflictException, 
                     self.client.exceptions.TooManyRequestsException,
                     self.client.exceptions.ServiceException) as e:
                 if attempt < max_retries - 1:
-                    sleep_time = (2 ** attempt) + random.random()
-                    time.sleep(sleep_time)
+                    time.sleep((2 ** attempt) + random.random())
                 else:
-                    print(f"Max retries reached for {function_name}: {e}")
                     return False
-            except Exception as e:
-                print(f"Unexpected error forcing cold start for {function_name}: {e}")
+            except Exception:
                 return False
 
     def invoke(self, function_name, payload=None, async_invoke=False):
