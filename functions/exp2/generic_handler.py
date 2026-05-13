@@ -10,8 +10,15 @@ except ImportError:
     from utils import get_response
 
 def lambda_handler(event, context):
-    func_name = os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'unknown')
+    full_func_name = os.environ.get('AWS_LAMBDA_FUNCTION_NAME', 'unknown')
     
+    # Matching logic: extract v_a, i_b, etc. from full function name
+    func_key = 'unknown'
+    for key in ['v_a', 'v_b', 'v_c', 'i_a', 'i_b', 'i_c', 'i_d', 'e_a', 'e_b', 'e_c', 'e_d']:
+        if key in full_func_name:
+            func_key = key
+            break
+
     # Define "Brutal" configurations for Exp 2 (Amplify the gap)
     configs = {
         # Video Analytics Chain
@@ -32,5 +39,5 @@ def lambda_handler(event, context):
         'e_d': {'init_ms': 10000, 'exec_ms': 2000}   
     }
     
-    config = configs.get(func_name, {'init_ms': 3000, 'exec_ms': 2000})
+    config = configs.get(func_key, {'init_ms': 10000, 'exec_ms': 5000})
     return get_response(event, context, config['exec_ms'], config['init_ms'])

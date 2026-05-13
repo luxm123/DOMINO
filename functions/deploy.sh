@@ -41,7 +41,7 @@ deploy_group() {
             aws lambda update-function-code --function-name $FUNC_NAME --zip-file fileb://$FUNC_NAME.zip --region $REGION > /dev/null
             echo "Waiting for $FUNC_NAME to finish updating..."
             aws lambda wait function-updated --function-name $FUNC_NAME --region $REGION
-            aws lambda update-function-configuration --function-name $FUNC_NAME --memory-size $MEMORY --timeout 10 --region $REGION > /dev/null
+            aws lambda update-function-configuration --function-name $FUNC_NAME --memory-size $MEMORY --timeout 60 --region $REGION > /dev/null
         else
             echo "Creating $FUNC_NAME..."
             aws lambda create-function --function-name $FUNC_NAME \
@@ -50,7 +50,7 @@ deploy_group() {
                 --handler lambda_handler.lambda_handler \
                 --zip-file fileb://$FUNC_NAME.zip \
                 --memory-size $MEMORY \
-                --timeout 10 \
+                --timeout 60 \
                 --region $REGION > /dev/null
             aws lambda wait function-active --function-name $FUNC_NAME --region $REGION
         fi

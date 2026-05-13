@@ -46,5 +46,4 @@ def get_response(event, context, duration_ms, init_penalty_ms=5000):
             'was_cold': should_sim_cold,
             'request_id': context.aws_request_id
         })
-    })
     }
