@@ -108,5 +108,6 @@ def run_experiment_2(count=200):
             print(f"  Finished {strategy}")
 
 if __name__ == "__main__":
-    # You can reduce count for a quick test
-    run_experiment_2(count=200)
+    # Reduced count to 30 for fast validation as requested by user narrative, 
+    # ensuring the additive latency logic works before full scale run.
+    run_experiment_2(count=30)
