@@ -21,21 +21,19 @@ def get_response(event, context, duration_ms, init_penalty_ms=5000):
     now = time.time()
     is_warmup = event.get('warmup', False)
     
-    # Logic to identify artificial cold start:
-    # 1. Real cold start (first time global scope is executed)
-    # 2. Simulated cold start (idle time > threshold)
+    # Identify cold start
     idle_time = now - _LAST_INVOKE_TIME if _LAST_INVOKE_TIME > 0 else 0
-    
     should_sim_cold = _IS_COLD or (idle_time > SIMULATED_TAU_SEC)
     
     if should_sim_cold:
-        # Realistic initialization penalty (e.g., loading heavy libraries)
+        # 1. ALWAYS execute initialization penalty if cold
         time.sleep(init_penalty_ms / 1000.0)
         _IS_COLD = False
     
-    # Always update last invoke time, even for warmup calls
     _LAST_INVOKE_TIME = time.time()
-    
+
+    # 2. ALWAYS execute simulation work if NOT a warmup request
+    # This ensures Cold Latency = Init + Exec
     if not is_warmup:
         simulate_work(duration_ms)
     
@@ -46,7 +44,7 @@ def get_response(event, context, duration_ms, init_penalty_ms=5000):
             'duration_ms': duration_ms if not is_warmup else 0,
             'is_warmup': is_warmup,
             'was_cold': should_sim_cold,
-            'idle_time_sec': round(idle_time, 2),
             'request_id': context.aws_request_id
         })
+    })
     }
