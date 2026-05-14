@@ -14,7 +14,6 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
 
     workflows = ['chain', 'fanout', 'branch']
     strategies = ['vanilla', 'keep_alive', 'orion', 'domino']
-    colors = ['#cccccc', '#888888', '#444444', '#000000']
     
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
     
@@ -23,9 +22,9 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
         ax2 = ax.twinx() # Create a twin axis for warmup counts
         
         x = np.arange(len(strategies))
-        width = 0.25
+        width = 0.65
         
-        p50s, p95s, p99s = [], [], []
+        p99s = []
         avg_warmups = []
         
         for strategy in strategies:
@@ -34,15 +33,14 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
             warmups = data['warmup_calls']
             
             stats = calculate_stats(latencies)
-            p50s.append(stats['p50'] / 1000.0) 
-            p95s.append(stats['p95'] / 1000.0)
             p99s.append(stats['p99'] / 1000.0)
             avg_warmups.append(sum(warmups) / len(warmups) if warmups else 0)
         
         # Plot Latencies (Left Axis)
-        ax.bar(x - width, p50s, width, label='P50 (Latency)', color='#A6CEE3', alpha=0.8)
-        ax.bar(x, p95s, width, label='P95 (Latency)', color='#1F78B4', alpha=0.8)
-        ax.bar(x + width, p99s, width, label='P99 (Latency)', color='#B2DF8A', alpha=0.8)
+        bar_colors = ['#BDBDBD', '#66BD63', '#2C7FB8', '#F28E2B']
+        ax.bar(x, p99s, width, label='P99 (Latency)', color=bar_colors, alpha=0.9)
+        for xi, val in zip(x, p99s):
+            ax.text(xi, val + 0.35, f"{val:.2f}", ha='center', va='bottom', fontsize=9)
         
         # Plot Warmups (Right Axis)
         ax2.plot(x, avg_warmups, color='red', marker='D', linestyle='-', linewidth=2, label='Avg Warmups', markersize=8)
@@ -67,9 +65,9 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
         ax.grid(axis='y', linestyle='--', alpha=0.5)
 
     plt.tight_layout()
-    plt.savefig(f'{output_dir}/exp2_performance_comparison.png', dpi=300)
-    plt.savefig(f'{output_dir}/exp2_performance_comparison.pdf')
-    print(f"Plot saved to {output_dir}/exp2_performance_comparison.png")
+    plt.savefig(f'{output_dir}/exp2_p99_comparison.png', dpi=300)
+    plt.savefig(f'{output_dir}/exp2_p99_comparison.pdf')
+    print(f"Plot saved to {output_dir}/exp2_p99_comparison.png")
 
 if __name__ == "__main__":
     plot_performance_bars()
