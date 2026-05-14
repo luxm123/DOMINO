@@ -204,7 +204,6 @@ def run_orchestrator_overhead_microbenchmark(iters=5000, output_csv='data/exp3/o
     os.makedirs(os.path.dirname(output_csv), exist_ok=True)
 
     fake_client = FakeLambdaClient()
-    executor = DAGExecutor(fake_client)
 
     workflow_generators = {
         'chain': _generate_chain_dag,
@@ -228,27 +227,79 @@ def run_orchestrator_overhead_microbenchmark(iters=5000, output_csv='data/exp3/o
             except Exception:
                 continue
 
+    def simulate_once(dag, strategy, warmup_table=None):
+        start = time.perf_counter()
+        first_warmup_ms = None
+
+        def warmup_call(fn):
+            nonlocal first_warmup_ms
+            if first_warmup_ms is None:
+                first_warmup_ms = (time.perf_counter() - start) * 1000.0
+            fake_client.invoke(fn, payload={'warmup': True}, async_invoke=True)
+
+        current_nodes = [dag['start_node']]
+        executed_nodes = set()
+
+        while current_nodes:
+            next_level = []
+
+            for node_id in current_nodes:
+                if node_id in executed_nodes:
+                    continue
+                executed_nodes.add(node_id)
+
+                node_cfg = dag['nodes'].get(node_id, {})
+                successors = node_cfg.get('next', [])
+                probs = node_cfg.get('prob')
+
+                if strategy == WarmupStrategy.ORION:
+                    for succ in successors:
+                        warmup_call(succ)
+                elif strategy == WarmupStrategy.DOMINO and warmup_table is not None:
+                    warmup_info = warmup_table.get(node_id)
+                    if warmup_info and warmup_info.get('timing') == 'on_start':
+                        for succ in warmup_info.get('successors_to_warm', []):
+                            warmup_call(succ)
+
+                fake_client.invoke(node_id, payload={}, async_invoke=False)
+
+                if not successors:
+                    continue
+
+                if probs:
+                    chosen = successors[0]
+                    next_level.append(chosen)
+                    if strategy == WarmupStrategy.DOMINO and warmup_table is not None:
+                        warmup_info = warmup_table.get(node_id)
+                        if warmup_info and warmup_info.get('timing') == 'on_output':
+                            warmup_call(chosen)
+                else:
+                    next_level.extend(successors)
+
+            current_nodes = list(dict.fromkeys(next_level))
+
+        total_ms = (time.perf_counter() - start) * 1000.0
+        return (first_warmup_ms or 0.0), total_ms
+
     for wf_name, gen in workflow_generators.items():
         for n in sizes:
             dag = gen(n)
 
-            t0 = time.time()
+            t0 = time.perf_counter()
             warmup_table = MarkovModel(dag).compute_optimal_warmup()
-            offline_ms = (time.time() - t0) * 1000.0
+            offline_ms = (time.perf_counter() - t0) * 1000.0
 
             for strategy in [WarmupStrategy.ORION, WarmupStrategy.DOMINO]:
+                print(f"[overhead] workflow={wf_name} nodes={n} strategy={strategy} iters={iters}", flush=True)
                 first_warmup_offsets = []
                 online_total_ms = []
 
-                for _ in range(iters):
-                    if strategy == WarmupStrategy.DOMINO:
-                        res = executor.execute_dag(dag, strategy=strategy, warmup_table=warmup_table)
-                    else:
-                        res = executor.execute_dag(dag, strategy=strategy)
-
-                    m = res.get('metrics', {})
-                    first_warmup_offsets.append(m.get('first_warmup_offset_ms') or 0.0)
-                    online_total_ms.append(res.get('total_latency_ms') or 0.0)
+                for i in range(iters):
+                    fw_ms, total_ms = simulate_once(dag, strategy, warmup_table=warmup_table)
+                    first_warmup_offsets.append(fw_ms)
+                    online_total_ms.append(total_ms)
+                    if (i + 1) % max(1, (iters // 5)) == 0:
+                        print(f"[overhead]  progress {i+1}/{iters}", flush=True)
 
                 fw = _summarize(first_warmup_offsets)
                 online = _summarize(online_total_ms)
@@ -276,7 +327,7 @@ def run_orchestrator_overhead_microbenchmark(iters=5000, output_csv='data/exp3/o
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"Saved: {output_csv}")
+    print(f"Saved: {output_csv}", flush=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
