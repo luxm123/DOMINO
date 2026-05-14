@@ -79,7 +79,7 @@ def run_experiment_2(count=200):
                 print(f"  Resuming {strategy} from {existing_count}/{count}...")
 
             if strategy == WarmupStrategy.KEEP_ALIVE:
-                executor.start_keep_alive(all_funcs)
+                executor.start_keep_alive(all_funcs, interval=30)
             
             for i in tqdm(range(existing_count, count)):
                 # Force cold start for all functions in the DAG except for Keep-Alive

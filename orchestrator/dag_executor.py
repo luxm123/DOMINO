@@ -17,7 +17,7 @@ class DAGExecutor:
         self.stop_keep_alive = False
         self.warmup_marker = {'warmup': True}
 
-    def start_keep_alive(self, functions, interval=240):
+    def start_keep_alive(self, functions, interval=30):
         self.stop_keep_alive = False
         def ping_loop():
             while not self.stop_keep_alive:
