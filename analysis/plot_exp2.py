@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
+import argparse
+import pandas as pd
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -69,5 +71,52 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
     plt.savefig(f'{output_dir}/exp2_p99_comparison.pdf')
     print(f"Plot saved to {output_dir}/exp2_p99_comparison.png")
 
+def plot_orchestrator_overhead(data_csv='data/exp3/overhead_microbenchmark.csv', output_dir='analysis/output'):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    if not os.path.exists(data_csv):
+        raise FileNotFoundError(data_csv)
+
+    df = pd.read_csv(data_csv)
+    workflows = ['chain', 'fanout', 'branch']
+    strategies = ['orion', 'domino']
+    sizes = sorted(df['dag_nodes'].unique().tolist())
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 8), sharex='col')
+
+    for j, wf in enumerate(workflows):
+        ax_top = axes[0][j]
+        ax_bot = axes[1][j]
+
+        for st in strategies:
+            sub = df[(df['workflow'] == wf) & (df['strategy'] == st)].sort_values('dag_nodes')
+            ax_top.plot(sub['dag_nodes'], sub['first_warmup_p99_ms'], marker='o', linewidth=2, label=st.upper())
+
+        sub_domino = df[(df['workflow'] == wf) & (df['strategy'] == 'domino')].sort_values('dag_nodes')
+        ax_bot.plot(sub_domino['dag_nodes'], sub_domino['offline_analysis_ms'], marker='o', linewidth=2, color='#F28E2B')
+
+        ax_top.set_title(f'{wf.capitalize()}: First Warmup P99', fontsize=12, fontweight='bold')
+        ax_top.set_ylabel('ms')
+        ax_top.grid(axis='y', linestyle='--', alpha=0.4)
+
+        ax_bot.set_title(f'{wf.capitalize()}: Offline Analysis', fontsize=12, fontweight='bold')
+        ax_bot.set_ylabel('ms')
+        ax_bot.set_xlabel('DAG Nodes')
+        ax_bot.set_xticks(sizes)
+        ax_bot.grid(axis='y', linestyle='--', alpha=0.4)
+
+    axes[0][0].legend(loc='upper left', fontsize=10)
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/orchestrator_overhead_microbenchmark.png', dpi=300)
+    plt.savefig(f'{output_dir}/orchestrator_overhead_microbenchmark.pdf')
+    print(f"Plot saved to {output_dir}/orchestrator_overhead_microbenchmark.png")
+
 if __name__ == "__main__":
-    plot_performance_bars()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--overhead", action="store_true")
+    args = parser.parse_args()
+
+    if args.overhead:
+        plot_orchestrator_overhead()
+    else:
+        plot_performance_bars()

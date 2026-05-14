@@ -31,16 +31,30 @@ class DAGExecutor:
     def stop_keep_alive_service(self):
         self.stop_keep_alive = True
 
-    def execute_dag(self, dag_config, strategy=WarmupStrategy.VANILLA, model_params=None):
+    def execute_dag(self, dag_config, strategy=WarmupStrategy.VANILLA, model_params=None, warmup_table=None):
         results = {}
         workflow_start = time.time()
         warmup_call_count = 0
+        metrics = {
+            'offline_analysis_ms': 0.0,
+            'first_warmup_offset_ms': None
+        }
+        first_warmup_lock = threading.Lock()
+
+        def record_first_warmup():
+            if metrics['first_warmup_offset_ms'] is not None:
+                return
+            with first_warmup_lock:
+                if metrics['first_warmup_offset_ms'] is None:
+                    metrics['first_warmup_offset_ms'] = (time.time() - workflow_start) * 1000.0
         
         # DOMINO Step 1: Offline analysis
-        warmup_table = {}
         if strategy == WarmupStrategy.DOMINO:
-            model = MarkovModel(dag_config, model_params)
-            warmup_table = model.compute_optimal_warmup()
+            if warmup_table is None:
+                t0 = time.time()
+                model = MarkovModel(dag_config, model_params)
+                warmup_table = model.compute_optimal_warmup()
+                metrics['offline_analysis_ms'] = (time.time() - t0) * 1000.0
 
         # Topological execution
         current_nodes = [dag_config['start_node']]
@@ -60,6 +74,7 @@ class DAGExecutor:
                 if strategy == WarmupStrategy.ORION:
                     successors = dag_config['nodes'].get(node_id, {}).get('next', [])
                     for succ in successors:
+                        record_first_warmup()
                         self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
                         with level_warmup_lock: nonlocal_warmup_count[0] += 1
                 
@@ -72,6 +87,7 @@ class DAGExecutor:
                             if d > 0:
                                 time.sleep(d / 1000.0)
                             for succ in funcs:
+                                record_first_warmup()
                                 self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
                         
                         if delay > 0:
@@ -79,6 +95,7 @@ class DAGExecutor:
                             with level_warmup_lock: nonlocal_warmup_count[0] += len(warmup_info["successors_to_warm"])
                         else:
                             for succ in warmup_info["successors_to_warm"]:
+                                record_first_warmup()
                                 self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
                                 with level_warmup_lock: nonlocal_warmup_count[0] += 1
 
@@ -105,6 +122,7 @@ class DAGExecutor:
                                 # DOMINO Optimization: Only invoke if we actually need to warm up.
                                 # This avoids network overhead for non-pre-warmable paths.
                                 if chosen in warmup_info.get("successors_to_warm", successors):
+                                    record_first_warmup()
                                     self.client.invoke(chosen, payload=self.warmup_marker, async_invoke=True)
                                     with level_warmup_lock: nonlocal_warmup_count[0] += 1
                     else: # Chain or Fanout
@@ -131,5 +149,6 @@ class DAGExecutor:
             'total_latency_ms': (workflow_end - workflow_start) * 1000,
             'steps': list(results.values()),
             'strategy': strategy,
-            'warmup_call_count': warmup_call_count
+            'warmup_call_count': warmup_call_count,
+            'metrics': metrics
         }
