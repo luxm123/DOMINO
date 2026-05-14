@@ -30,7 +30,7 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
         avg_warmups = []
         
         for strategy in strategies:
-            data = load_exp2_data(data_dir, wf, strategy)
+            data = load_exp2_data(data_dir, wf, strategy, prefix='exp2')
             latencies = data['latencies']
             warmups = data['warmup_calls']
             
@@ -71,7 +71,7 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
     plt.savefig(f'{output_dir}/exp2_p99_comparison.pdf')
     print(f"Plot saved to {output_dir}/exp2_p99_comparison.png")
 
-def plot_ablation_p99(data_dir='data/exp2', output_dir='analysis/output'):
+def plot_ablation_p99(data_dir='data/exp2_ablation', output_dir='analysis/output', prefix='exp2_ablation'):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -92,7 +92,7 @@ def plot_ablation_p99(data_dir='data/exp2', output_dir='analysis/output'):
         present_colors = []
 
         for s, c in zip(strategies, colors):
-            data = load_exp2_data(data_dir, wf, s)
+            data = load_exp2_data(data_dir, wf, s, prefix=prefix)
             if not data['latencies']:
                 continue
             stats = calculate_stats(data['latencies'])

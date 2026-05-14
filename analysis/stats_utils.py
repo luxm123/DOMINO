@@ -15,11 +15,11 @@ def calculate_stats(latencies):
         'mean': np.mean(latencies)
     }
 
-def load_exp2_data(data_dir, workflow, strategy):
+def load_exp2_data(data_dir, workflow, strategy, prefix='exp2'):
     """
     Load total_latency_ms and warmup_call_count from CSV.
     """
-    file_path = f"{data_dir}/exp2_{workflow}_{strategy}.csv"
+    file_path = f"{data_dir}/{prefix}_{workflow}_{strategy}.csv"
     try:
         df = pd.read_csv(file_path)
         return {

@@ -45,11 +45,12 @@ WORKFLOWS = {
     }
 }
 
-def run_experiment_2(count=200, workflows=None, strategies=None, keep_alive_interval=30, keep_alive_bootstrap_sec=12):
+def run_experiment_2(count=200, workflows=None, strategies=None, data_dir='data/exp2', experiment_prefix='exp2'):
     from orchestrator.lambda_client import LambdaClient
     client = LambdaClient()
     executor = DAGExecutor(client)
-    logger = EventLogger(output_dir='data/exp2')
+    logger = EventLogger(output_dir=data_dir)
+    os.makedirs(data_dir, exist_ok=True)
     
     if workflows is None:
         workflows = WORKFLOWS
@@ -71,7 +72,7 @@ def run_experiment_2(count=200, workflows=None, strategies=None, keep_alive_inte
             print(f"  Strategy: {strategy}")
             
             # --- Resume Logic: Check if we already have data ---
-            csv_path = f"data/exp2/exp2_{wf_name}_{strategy}.csv"
+            csv_path = f"{data_dir}/{experiment_prefix}_{wf_name}_{strategy}.csv"
             existing_count = 0
             if os.path.exists(csv_path):
                 try:
@@ -86,14 +87,13 @@ def run_experiment_2(count=200, workflows=None, strategies=None, keep_alive_inte
             elif existing_count > 0:
                 print(f"  Resuming {strategy} from {existing_count}/{count}...")
 
-            if strategy == WarmupStrategy.KEEP_ALIVE:
-                warm_nodes = list(dag['nodes'].keys())
-                for node in warm_nodes:
-                    client.invoke(node, payload={'warmup': True}, async_invoke=False)
-            
             for i in tqdm(range(existing_count, count)):
                 # Force cold start for all functions in the DAG except for Keep-Alive
-                if strategy != WarmupStrategy.KEEP_ALIVE:
+                if strategy == WarmupStrategy.KEEP_ALIVE:
+                    warm_nodes = list(dag['nodes'].keys())
+                    for node in warm_nodes:
+                        client.invoke(node, payload={'warmup': True}, async_invoke=False)
+                else:
                     # Get nodes involved in current DAG
                     nodes_to_reset = list(dag['nodes'].keys())
                     
@@ -107,13 +107,9 @@ def run_experiment_2(count=200, workflows=None, strategies=None, keep_alive_inte
                     # Give AWS a moment to stabilize after updates
                     # Increased to 30s to ensure the new "cold" fleet is truly ready.
                     time.sleep(30)
-                else:
-                    warm_nodes = list(dag['nodes'].keys())
-                    for node in warm_nodes:
-                        client.invoke(node, payload={'warmup': True}, async_invoke=False)
 
                 res = executor.execute_dag(dag, strategy=strategy)
-                logger.log_workflow(f"exp2_{wf_name}_{strategy}", res)
+                logger.log_workflow(f"{experiment_prefix}_{wf_name}_{strategy}", res)
                 time.sleep(1) # Gap between runs
                 
             print(f"  Finished {strategy}")
@@ -373,11 +369,17 @@ if __name__ == "__main__":
         if args.fresh:
             for wf in selected_workflows.keys():
                 for st in selected_strategies:
-                    p = f"data/exp2/exp2_{wf}_{st}.csv"
+                    p = f"data/exp2_ablation/exp2_ablation_{wf}_{st}.csv"
                     if os.path.exists(p):
                         os.remove(p)
 
-        run_experiment_2(count=args.count, workflows=selected_workflows, strategies=selected_strategies)
+        run_experiment_2(
+            count=args.count,
+            workflows=selected_workflows,
+            strategies=selected_strategies,
+            data_dir='data/exp2_ablation',
+            experiment_prefix='exp2_ablation'
+        )
         raise SystemExit(0)
 
     selected_workflows = WORKFLOWS if args.workflow == "all" else {args.workflow: WORKFLOWS[args.workflow]}
@@ -394,4 +396,4 @@ if __name__ == "__main__":
                 if os.path.exists(p):
                     os.remove(p)
 
-    run_experiment_2(count=args.count, workflows=selected_workflows, strategies=selected_strategies)
+    run_experiment_2(count=args.count, workflows=selected_workflows, strategies=selected_strategies, data_dir='data/exp2', experiment_prefix='exp2')
