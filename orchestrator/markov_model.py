@@ -2,9 +2,10 @@ import yaml
 import os
 
 class MarkovModel:
-    def __init__(self, dag_config, model_params=None):
+    def __init__(self, dag_config, model_params=None, variant="domino"):
         self.dag = dag_config
         self.params = model_params or {}
+        self.variant = variant
 
     def compute_optimal_warmup(self):
         """
@@ -13,6 +14,9 @@ class MarkovModel:
         """
         warmup_table = {}
         nodes = self.dag.get('nodes', {})
+
+        enable_multihop = self.variant not in ("domino_no_multihop", "domino_no_multihop_no_branch")
+        enable_branch_opt = self.variant not in ("domino_no_branch", "domino_no_multihop_no_branch")
         
         for node_id, config in nodes.items():
             successors = config.get('next', [])
@@ -28,10 +32,13 @@ class MarkovModel:
             #    OR wait for output signal if probabilities are close.
             
             if probs: # Branch
-                    # DOMINO Direction 1: Cost-efficient branching
-                    # If one branch is significantly more likely (> 0.7), warm it up on start.
-                    # Otherwise, use 'on_output' to wait for the actual branch decision.
-                    # This avoids network calls to the wrong branch entirely.
+                if not enable_branch_opt:
+                    warmup_table[node_id] = {
+                        "successors_to_warm": successors,
+                        "timing": "on_start",
+                        "delay_ms": 0
+                    }
+                else:
                     max_prob = max(probs)
                     if max_prob > 0.7:
                         idx = probs.index(max_prob)
@@ -41,32 +48,24 @@ class MarkovModel:
                             "delay_ms": 0
                         }
                     else:
-                        # For 0.5/0.5 branches, we wait for output to be precise.
-                        # This avoids any pre-warmup calls until the branch is chosen.
                         warmup_table[node_id] = {
-                            "successors_to_warm": [], # IMPORTANT: Empty list here
-                            "timing": "on_output"     # Execution logic will handle chosen successor
+                            "successors_to_warm": [],
+                            "timing": "on_output"
                         }
             else: # Chain or Fanout
                 if node_id == 'v_a': # Chain root
-                    # DOMINO Direction 1: Multi-hop Pre-warming
-                    # We pre-warm both v_b and v_c to cover the cold start overlap.
-                    # ORION only warms v_b, so v_c will still be cold.
                     warmup_table[node_id] = {
-                        "successors_to_warm": ['v_b', 'v_c'],
+                        "successors_to_warm": ['v_b', 'v_c'] if enable_multihop else ['v_b'],
                         "timing": "on_start",
                         "delay_ms": 0 
                     }
                 elif node_id == 'i_a': # Fanout root
-                    # Pre-warm everything in the fanout to ensure the join node (i_d) 
-                    # is ready in time.
                     warmup_table[node_id] = {
-                        "successors_to_warm": ['i_b', 'i_c', 'i_d'],
+                        "successors_to_warm": ['i_b', 'i_c', 'i_d'] if enable_multihop else ['i_b', 'i_c'],
                         "timing": "on_start",
                         "delay_ms": 0
                     }
                 elif node_id in ['i_b', 'i_c']:
-                    # Already handled by i_a's multi-hop warming
                     warmup_table[node_id] = {
                         "successors_to_warm": [],
                         "timing": "on_start",

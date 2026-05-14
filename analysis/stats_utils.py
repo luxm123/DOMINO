@@ -26,6 +26,8 @@ def load_exp2_data(data_dir, workflow, strategy):
             'latencies': df['total_latency_ms'].tolist(),
             'warmup_calls': df['warmup_call_count'].tolist() if 'warmup_call_count' in df.columns else [0]*len(df)
         }
+    except FileNotFoundError:
+        return {'latencies': [], 'warmup_calls': []}
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
         return {'latencies': [], 'warmup_calls': []}

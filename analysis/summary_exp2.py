@@ -10,7 +10,15 @@ from analysis.stats_utils import calculate_stats, load_exp2_data
 
 def summarize_exp2(data_dir='data/exp2'):
     workflows = ['chain', 'fanout', 'branch']
-    strategies = ['vanilla', 'keep_alive', 'orion', 'domino']
+    strategies = [
+        'vanilla',
+        'keep_alive',
+        'orion',
+        'domino',
+        'domino_no_multihop',
+        'domino_no_branch',
+        'domino_no_multihop_no_branch'
+    ]
     
     print(f"{'Workflow':<10} | {'Strategy':<12} | {'P50 (s)':<8} | {'P95 (s)':<8} | {'P99 (s)':<8} | {'Avg Warmups':<12}")
     print("-" * 92)

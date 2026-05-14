@@ -331,16 +331,53 @@ def run_orchestrator_overhead_microbenchmark(iters=5000, output_csv='data/exp3/o
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", type=str, default="exp2", choices=["exp2", "overhead"])
+    parser.add_argument("--mode", type=str, default="exp2", choices=["exp2", "ablation", "overhead"])
     parser.add_argument("--count", type=int, default=30)
     parser.add_argument("--workflow", type=str, default="all", choices=["all"] + list(WORKFLOWS.keys()))
-    parser.add_argument("--strategy", type=str, default="all", choices=["all", "vanilla", "keep_alive", "orion", "domino"])
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="all",
+        choices=[
+            "all",
+            "vanilla",
+            "keep_alive",
+            "orion",
+            "domino",
+            "domino_no_multihop",
+            "domino_no_branch",
+            "domino_no_multihop_no_branch"
+        ]
+    )
     parser.add_argument("--fresh", action="store_true")
     parser.add_argument("--iters", type=int, default=5000)
     args = parser.parse_args()
 
     if args.mode == "overhead":
         run_orchestrator_overhead_microbenchmark(iters=args.iters)
+        raise SystemExit(0)
+
+    if args.mode == "ablation":
+        selected_workflows = WORKFLOWS if args.workflow == "all" else {args.workflow: WORKFLOWS[args.workflow]}
+        selected_strategies = [
+            WarmupStrategy.ORION,
+            WarmupStrategy.DOMINO,
+            WarmupStrategy.DOMINO_NO_MULTIHOP,
+            WarmupStrategy.DOMINO_NO_BRANCH,
+            WarmupStrategy.DOMINO_NO_MULTIHOP_NO_BRANCH
+        ]
+
+        if args.strategy != "all":
+            selected_strategies = [args.strategy]
+
+        if args.fresh:
+            for wf in selected_workflows.keys():
+                for st in selected_strategies:
+                    p = f"data/exp2/exp2_{wf}_{st}.csv"
+                    if os.path.exists(p):
+                        os.remove(p)
+
+        run_experiment_2(count=args.count, workflows=selected_workflows, strategies=selected_strategies)
         raise SystemExit(0)
 
     selected_workflows = WORKFLOWS if args.workflow == "all" else {args.workflow: WORKFLOWS[args.workflow]}

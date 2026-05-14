@@ -71,6 +71,57 @@ def plot_performance_bars(data_dir='data/exp2', output_dir='analysis/output'):
     plt.savefig(f'{output_dir}/exp2_p99_comparison.pdf')
     print(f"Plot saved to {output_dir}/exp2_p99_comparison.png")
 
+def plot_ablation_p99(data_dir='data/exp2', output_dir='analysis/output'):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    workflows = ['chain', 'fanout', 'branch']
+    strategies = ['orion', 'domino', 'domino_no_multihop', 'domino_no_branch', 'domino_no_multihop_no_branch']
+    colors = ['#2C7FB8', '#F28E2B', '#8DA0CB', '#66BD63', '#BDBDBD']
+
+    fig, axes = plt.subplots(1, 3, figsize=(20, 5))
+
+    for idx, wf in enumerate(workflows):
+        ax = axes[idx]
+        x = np.arange(len(strategies))
+        width = 0.7
+
+        p99s = []
+        avg_warmups = []
+        present = []
+        present_colors = []
+
+        for s, c in zip(strategies, colors):
+            data = load_exp2_data(data_dir, wf, s)
+            if not data['latencies']:
+                continue
+            stats = calculate_stats(data['latencies'])
+            p99s.append(stats['p99'] / 1000.0)
+            avg_warmups.append(sum(data['warmup_calls']) / len(data['warmup_calls']) if data['warmup_calls'] else 0)
+            present.append(s)
+            present_colors.append(c)
+
+        xx = np.arange(len(present))
+        ax2 = ax.twinx()
+        ax.bar(xx, p99s, width, color=present_colors, alpha=0.9)
+        for xi, val in zip(xx, p99s):
+            ax.text(xi, val + 0.25, f"{val:.2f}", ha='center', va='bottom', fontsize=9)
+
+        ax2.plot(xx, avg_warmups, color='red', marker='D', linestyle='-', linewidth=2, markersize=7)
+        ax2.set_ylim(0, (max(avg_warmups) if avg_warmups else 1) + 1)
+        ax2.tick_params(axis='y', labelcolor='red')
+
+        ax.set_title(f'Ablation: {wf.capitalize()}', fontsize=12, fontweight='bold')
+        ax.set_ylabel('P99 End-to-End Latency (s)')
+        ax.set_xticks(xx)
+        ax.set_xticklabels([p.upper() for p in present], rotation=15)
+        ax.grid(axis='y', linestyle='--', alpha=0.4)
+
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/exp2_ablation_p99.png', dpi=300)
+    plt.savefig(f'{output_dir}/exp2_ablation_p99.pdf')
+    print(f"Plot saved to {output_dir}/exp2_ablation_p99.png")
+
 def plot_orchestrator_overhead(data_csv='data/exp3/overhead_microbenchmark.csv', output_dir='analysis/output'):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -114,9 +165,12 @@ def plot_orchestrator_overhead(data_csv='data/exp3/overhead_microbenchmark.csv',
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--overhead", action="store_true")
+    parser.add_argument("--ablation", action="store_true")
     args = parser.parse_args()
 
     if args.overhead:
         plot_orchestrator_overhead()
+    elif args.ablation:
+        plot_ablation_p99()
     else:
         plot_performance_bars()

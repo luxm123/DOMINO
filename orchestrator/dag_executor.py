@@ -9,6 +9,9 @@ class WarmupStrategy:
     KEEP_ALIVE = "keep_alive"
     ORION = "orion"
     DOMINO = "domino"
+    DOMINO_NO_MULTIHOP = "domino_no_multihop"
+    DOMINO_NO_BRANCH = "domino_no_branch"
+    DOMINO_NO_MULTIHOP_NO_BRANCH = "domino_no_multihop_no_branch"
 
 class DAGExecutor:
     def __init__(self, lambda_client):
@@ -49,10 +52,11 @@ class DAGExecutor:
                     metrics['first_warmup_offset_ms'] = (time.time() - workflow_start) * 1000.0
         
         # DOMINO Step 1: Offline analysis
-        if strategy == WarmupStrategy.DOMINO:
+        is_domino = isinstance(strategy, str) and strategy.startswith("domino")
+        if is_domino:
             if warmup_table is None:
                 t0 = time.time()
-                model = MarkovModel(dag_config, model_params)
+                model = MarkovModel(dag_config, model_params, variant=strategy)
                 warmup_table = model.compute_optimal_warmup()
                 metrics['offline_analysis_ms'] = (time.time() - t0) * 1000.0
 
@@ -78,7 +82,7 @@ class DAGExecutor:
                         self.client.invoke(succ, payload=self.warmup_marker, async_invoke=True)
                         with level_warmup_lock: nonlocal_warmup_count[0] += 1
                 
-                elif strategy == WarmupStrategy.DOMINO:
+                elif is_domino:
                     warmup_info = warmup_table.get(node_id)
                     if warmup_info and warmup_info["timing"] == "on_start":
                         delay = warmup_info.get("delay_ms", 0)
@@ -116,7 +120,7 @@ class DAGExecutor:
                     if probs: # Branch
                         chosen = random.choices(successors, weights=probs, k=1)[0]
                         next_level.append(chosen)
-                        if strategy == WarmupStrategy.DOMINO:
+                        if is_domino:
                             warmup_info = warmup_table.get(node_id)
                             if warmup_info and warmup_info["timing"] == "on_output":
                                 # DOMINO Optimization: Only invoke if we actually need to warm up.
