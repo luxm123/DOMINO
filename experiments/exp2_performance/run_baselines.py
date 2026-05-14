@@ -84,10 +84,9 @@ def run_experiment_2(count=200, workflows=None, strategies=None, keep_alive_inte
                 print(f"  Resuming {strategy} from {existing_count}/{count}...")
 
             if strategy == WarmupStrategy.KEEP_ALIVE:
-                executor.start_keep_alive(all_funcs, interval=keep_alive_interval)
-                for f in all_funcs:
-                    client.invoke(f, payload={'warmup': True}, async_invoke=True)
-                time.sleep(keep_alive_bootstrap_sec)
+                warm_nodes = list(dag['nodes'].keys())
+                for node in warm_nodes:
+                    client.invoke(node, payload={'warmup': True}, async_invoke=False)
             
             for i in tqdm(range(existing_count, count)):
                 # Force cold start for all functions in the DAG except for Keep-Alive
@@ -105,13 +104,14 @@ def run_experiment_2(count=200, workflows=None, strategies=None, keep_alive_inte
                     # Give AWS a moment to stabilize after updates
                     # Increased to 30s to ensure the new "cold" fleet is truly ready.
                     time.sleep(30)
+                else:
+                    warm_nodes = list(dag['nodes'].keys())
+                    for node in warm_nodes:
+                        client.invoke(node, payload={'warmup': True}, async_invoke=False)
 
                 res = executor.execute_dag(dag, strategy=strategy)
                 logger.log_workflow(f"exp2_{wf_name}_{strategy}", res)
                 time.sleep(1) # Gap between runs
-                
-            if strategy == WarmupStrategy.KEEP_ALIVE:
-                executor.stop_keep_alive_service()
                 
             print(f"  Finished {strategy}")
 
