@@ -20,23 +20,26 @@ def lambda_handler(event, context):
             break
 
     # Define "Brutal" configurations for Exp 2 (Amplify the gap)
+    # Optimized for showing multi-stage pre-warming advantage:
+    # exec_ms is small (500ms) to shrink the one-step-ahead window.
+    # init_ms is large (10s) to make cold starts expensive.
     configs = {
         # Video Analytics Chain
-        'v_a': {'init_ms': 15000, 'exec_ms': 5000},  # 15s init
-        'v_b': {'init_ms': 25000, 'exec_ms': 10000}, # 25s init
-        'v_c': {'init_ms': 10000, 'exec_ms': 2000},  # 10s init
+        'v_a': {'init_ms': 10000, 'exec_ms': 500}, 
+        'v_b': {'init_ms': 10000, 'exec_ms': 500},
+        'v_c': {'init_ms': 10000, 'exec_ms': 500},
         
         # Image Pipeline Fanout
-        'i_a': {'init_ms': 10000, 'exec_ms': 3000},  
-        'i_b': {'init_ms': 20000, 'exec_ms': 8000}, 
-        'i_c': {'init_ms': 20000, 'exec_ms': 8000}, 
-        'i_d': {'init_ms': 10000, 'exec_ms': 2000},  
+        'i_a': {'init_ms': 10000, 'exec_ms': 500},  
+        'i_b': {'init_ms': 10000, 'exec_ms': 500}, 
+        'i_c': {'init_ms': 10000, 'exec_ms': 500}, 
+        'i_d': {'init_ms': 10000, 'exec_ms': 500},  
         
         # NLP Chat Branch
-        'e_a': {'init_ms': 10000, 'exec_ms': 3000},  
-        'e_b': {'init_ms': 30000, 'exec_ms': 12000},# 30s init
-        'e_c': {'init_ms': 30000, 'exec_ms': 12000},# 30s init
-        'e_d': {'init_ms': 10000, 'exec_ms': 2000}   
+        'e_a': {'init_ms': 10000, 'exec_ms': 500},  
+        'e_b': {'init_ms': 10000, 'exec_ms': 500},
+        'e_c': {'init_ms': 10000, 'exec_ms': 500},
+        'e_d': {'init_ms': 10000, 'exec_ms': 500}   
     }
     
     config = configs.get(func_key, {'init_ms': 10000, 'exec_ms': 5000})
